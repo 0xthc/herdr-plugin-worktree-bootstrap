@@ -1,0 +1,33 @@
+# herdr-plugin-worktree-bootstrap — seed new herdr worktrees with the files
+# git does not carry: .env files, node_modules, and other untracked local
+# state. Runs on the worktree.created event, so every worktree is usable the
+# moment it opens.
+#
+# Notes:
+#  - The hook never touches an existing file in the destination; a fresh git
+#    checkout cannot have any, but a re-created worktree at the same path
+#    might, and overwriting someone's .env by surprise would be rude.
+#  - node_modules is hardlinked by default (cp -al): instant, near-zero disk,
+#    and package managers replace rather than edit files in place, which keeps
+#    the link safe in practice. Set WTB_DIRS_MODE=copy to clone instead, or
+#    WTB_DIRS_MODE=skip to only copy plain files.
+
+id = "herdr-plugin-worktree-bootstrap"
+name = "Worktree Bootstrap"
+version = "0.1.0"
+description = "Copy .env files and untracked local state (node_modules etc.) into each new herdr worktree."
+min_herdr_version = "0.8.2"
+platforms = ["linux", "macos"]
+
+[[events]]
+on = "worktree.created"
+command = ["bash", "bin/bootstrap.sh"]
+
+# Re-run by hand for the focused workspace's worktree, e.g. after editing the
+# config or when a copy was interrupted.
+[[actions]]
+id = "rerun"
+title = "Re-run worktree bootstrap"
+description = "Seed the current workspace's worktree again (never overwrites existing files)."
+contexts = ["workspace"]
+command = ["bash", "bin/rerun.sh"]
