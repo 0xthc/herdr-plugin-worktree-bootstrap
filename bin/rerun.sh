@@ -24,7 +24,18 @@ fi
 record="$("${HERDR_BIN_PATH:-herdr}" api snapshot 2>/dev/null)"
 payload="$(jq --arg id "$ws" '
   .result.snapshot.workspaces[]? | select(.workspace_id == $id)
-  | { workspace: . }' <<<"$record" 2>/dev/null)"
+  | . as $workspace
+  | {
+      event: "worktree_created",
+      data: {
+        type: "worktree_created",
+        workspace: $workspace,
+        worktree: {
+          path: $workspace.worktree.checkout_path,
+          branch: null
+        }
+      }
+    }' <<<"$record" 2>/dev/null)"
 
 if [ -z "$payload" ]; then
   echo "worktree-bootstrap: could not resolve worktree for workspace $ws" >&2
