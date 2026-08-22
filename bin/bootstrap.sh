@@ -4,8 +4,11 @@
 # Invoked by herdr on the worktree.created event. The event payload
 # (HERDR_PLUGIN_EVENT_JSON) carries both sides we need:
 #
-#   .worktree.path                    -> the new worktree (destination)
-#   .workspace.worktree.repo_root     -> the main checkout (source)
+#   .data.worktree.path                    -> the new worktree (destination)
+#   .data.workspace.worktree.repo_root     -> the main checkout (source)
+#
+# Herdr's event envelope has a `data` wrapper. The unwrapped paths remain as
+# fallbacks for older/dev payload shapes.
 #
 # Everything is best-effort and non-fatal: a hook failure must never make the
 # worktree look broken. Diagnostics go to $HERDR_PLUGIN_STATE_DIR/log.
@@ -25,16 +28,16 @@ if [ -z "$json" ] || ! command -v jq >/dev/null 2>&1; then
 fi
 printf '%s\n' "$json" > "$state/last-event.json"
 
-dest="$(jq -r '.worktree.path // empty' <<<"$json")"
-src="$(jq -r '.workspace.worktree.repo_root // empty' <<<"$json")"
-branch="$(jq -r '.worktree.branch // "?"' <<<"$json")"
+dest="$(jq -r '.data.worktree.path // .worktree.path // empty' <<<"$json")"
+src="$(jq -r '.data.workspace.worktree.repo_root // .workspace.worktree.repo_root // empty' <<<"$json")"
+branch="$(jq -r '.data.worktree.branch // .worktree.branch // "?"' <<<"$json")"
 
 if [ -z "$dest" ]; then
   log "skip: no worktree path in payload"
   exit 0
 fi
 # Fall back to the workspace's own checkout path, then to git itself.
-[ -n "$src" ] || src="$(jq -r '.workspace.worktree.checkout_path // empty' <<<"$json")"
+[ -n "$src" ] || src="$(jq -r '.data.workspace.worktree.checkout_path // .workspace.worktree.checkout_path // empty' <<<"$json")"
 if [ -z "$src" ] && git -C "$dest" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   common="$(git -C "$dest" rev-parse --path-format=absolute --git-common-dir)"
   src="$(dirname "$common")"
